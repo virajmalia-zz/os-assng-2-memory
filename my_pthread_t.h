@@ -23,8 +23,10 @@
 #define MEMORY_SIZE 8 * 1024 * 1024
 #define PAGE_SIZE sysconf(_SC_PAGE_SIZE)
 
-#define malloc(x) myallocate(x, __FILE__, __LINE__, THREADREQ)
-#define free(x) mydeallocate(x, __FILE__, __LINE__, THREADREQ)
+bool MY_MALLOC = 0;
+
+#define malloc(x) myallocate(x, __FILE__, __LINE__, MY_MALLOC)
+#define free(x) mydeallocate(x, __FILE__, __LINE__, MY_MALLOC)
 
 // Globals
 typedef uint my_pthread_t;
@@ -33,6 +35,7 @@ char* mem_iter = memory;
 char** page_table = malloc( sizeof(char*) * (MEMORY_SIZE / PAGE_SIZE) );
 page_table = NULL;
 
+// 32 bytes
 typedef struct node{
     int size;
     char* data;
@@ -54,13 +57,11 @@ typedef struct threadControlBlock {
   // Memory related params
   // Total page size for a thread equals 4kB
   char* next_alloc;                     // Next available location
-  int rem_contig_space;
-  int rem_total_space;
+  int rem_contig_space = PAGE_SIZE;
+  int rem_total_space = PAGE_SIZE;
   int page_id;
   node_ptr head;
   //node_ptr tail;
-
-  //node_ptr* nodule;
 } tcb, *tcb_ptr;
 
 /* mutex struct definition */
@@ -106,8 +107,8 @@ blockedThreadList_ptr getBlockedThreadList();
 int addToBlockedThreadList(tcb_ptr,tcb_ptr);
 finishedThread_ptr getCompletedThread();
 finished_Queue getFinishedQueue();
-void* myallocate(int size);
-void* mydeallocate(void* ptr);
+void* myallocate(int size, int file_num, int line_num, bool alloc_flag);
+void mydeallocate(void* ptr, int file_num, int line_num, bool dealloc_flag);
 
 /* Function Declarations: */
 

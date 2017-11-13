@@ -594,16 +594,36 @@ int my_pthread_mutex_destroy(my_pthread_mutex_t *mutex) {
 	return 0;
 };
 
-void* myallocate(int size, , ,){
-    // LinkedList
+void* myallocate(int size, int file_num, int line_num, bool alloc_flag){
+
+    tcb_ptr block = getCurrentBlock(queue); // get 4kB block
+
+    if(size > block->rem_total_space)
+        return NULL;
 
     node_ptr nodule = malloc(size);
-    nodule.size = size;
-    // head pointer to 32 bytes LL
-    tcb_ptr ...getCurrentBlock;
-    block->next_alloc
-    nodule.data = block->next_alloc;
-    block->next_alloc += size;
 
-    return nodule.data;
+    nodule->size = size;
+    block->rem_contig_space -= size;
+    block->rem_total_space -= size;
+    nodule->data = block->next_alloc;
+    nodule->valid = 1;
+    block->next_alloc += size + 1;
+    nodule->next = block->next_alloc - 1;
+
+    *(nodule->next) = NULL;
+    if(block->head != NULL)
+        *(nodule->next - 1 - nodule->size) = nodule->next - nodule->size;
+
+    return nodule->data;
+}
+
+void mydeallocate(void* ptr, int file_num, int line_num, bool dealloc_flag){
+    tcb_ptr nodule = (tcb_ptr) ptr;
+    tcb_ptr block = getCurrentBlock(queue);
+
+    *(nodule->data - 1) = *(nodule->next);      // Transfer link
+    block->rem_total_space += nodule->size;     // Increase available size
+    // rem_contig_space
+    nodule->valid = 0;                          // Invalidate nodule
 }
