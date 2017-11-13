@@ -20,11 +20,28 @@
 #include <stdbool.h>
 #define STACKSIZE 8 * 1024
 #define MAXTHREADS 20
+#define MEMORY_SIZE 8 * 1024 * 1024
+#define PAGE_SIZE sysconf(_SC_PAGE_SIZE)
 
+#define malloc(x) myallocate(x, __FILE__, __LINE__, THREADREQ)
+#define free(x) mydeallocate(x, __FILE__, __LINE__, THREADREQ)
+
+// Globals
 typedef uint my_pthread_t;
+char* memory = (char*) malloc(MEMORY_SIZE*sizeof(char));     // 8MB memory
+char* mem_iter = memory;
+char** page_table = malloc( sizeof(char*) * (MEMORY_SIZE / PAGE_SIZE) );
+page_table = NULL;
+
+typedef struct node{
+    int size;
+    char* data;
+    char* next; // next byte after allocation
+    bool valid;
+}* node_ptr;
 
 typedef struct threadControlBlock {
-	/* add something here */
+  // Thread related params
   my_pthread_t thread_id;
   ucontext_t thread_context;
   int isActive;
@@ -33,19 +50,26 @@ typedef struct threadControlBlock {
   int isMain;
   struct threadControlBlock *next;
   struct blockedThreadList *blockedThreads;
+
+  // Memory related params
+  // Total page size for a thread equals 4kB
+  char* next_alloc;                     // Next available location
+  int rem_contig_space;
+  int rem_total_space;
+  int page_id;
+  node_ptr head;
+  //node_ptr tail;
+
+  //node_ptr* nodule;
 } tcb, *tcb_ptr;
 
 /* mutex struct definition */
 typedef struct my_pthread_mutex_t {
-	/* add something here */
   int lock;
   int count;
   volatile my_pthread_t owner;
 } my_pthread_mutex_t;
 
-/* define your data structures here: */
-
-// Feel free to add your own auxiliary data structures
 typedef struct threadQueue {
   tcb_ptr head;
   tcb_ptr tail;
@@ -82,6 +106,8 @@ blockedThreadList_ptr getBlockedThreadList();
 int addToBlockedThreadList(tcb_ptr,tcb_ptr);
 finishedThread_ptr getCompletedThread();
 finished_Queue getFinishedQueue();
+void* myallocate(int size);
+void* mydeallocate(void* ptr);
 
 /* Function Declarations: */
 

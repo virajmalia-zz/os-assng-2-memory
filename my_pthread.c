@@ -44,7 +44,9 @@ tcb_ptr getControlBlock_Main(){
   controlBlock->isBlocked =0;
   controlBlock->isExecuted =0;
   controlBlock->isMain =1 ;
-  controlBlock->next = NULL ;
+  controlBlock->next = NULL;
+  controlBlock->page_id = -1;
+  controlBlock->next_alloc = NULL;
 
   return controlBlock;
 
@@ -61,6 +63,8 @@ tcb_ptr getControlBlock(){
   controlBlock->isExecuted =0;
   controlBlock->isMain =0 ;
   controlBlock->next = NULL ;
+  controlBlock->page_id = -1;
+  controlBlock->next_alloc = NULL;
 
   return controlBlock;
 
@@ -189,7 +193,6 @@ int enqueueToCompletedList(finished_Queue queue,finishedThread_ptr finishedThrea
   return 0;
 }
 
-
 finishedThread_ptr getFinishedThread(finished_Queue queue,my_pthread_t thread_id,int flag) {
 
   if(queue!=NULL) {
@@ -249,7 +252,6 @@ finishedThread_ptr getCompletedThread() {
 
   return finishedThread;
 }
-
 
 finished_Queue getFinishedQueue() {
   finished_Queue finishedQueue = (finished_Queue)malloc(sizeof(struct finishedControlBlockQueue));
@@ -348,7 +350,6 @@ void scheduler(int signum){
 
 }
 
-
 // init process
 void my_pthread_init(long period){
   threadid = 1;
@@ -359,6 +360,9 @@ void my_pthread_init(long period){
   queue = getQueue();
   millisec = period;
   tcb_ptr mainThread = getControlBlock_Main();
+  mainThread->page_id = 0;
+  page_table[0] = mem_iter;
+  mem_iter += (4*1024);
   //getcontext(&(MainThread->thread_context));
   //printf("in init \n");
   getCommonContext();
@@ -376,7 +380,6 @@ void my_pthread_init(long period){
   setitimer(ITIMER_VIRTUAL, &timeslice, NULL);
   //printf("Exiting init");
 }
-
 
 /* create a new thread */
 int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*function)(void*), void * arg) {
@@ -397,6 +400,19 @@ int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*func
     //temp =rand();
     threadCB->thread_id= ++threadid;
     *thread = threadCB->thread_id;
+
+    // Allocate 4kB entry in page table
+    int i=0;
+    while(i<MEMORY_SIZE/PAGE_SIZE){
+        if(page_table[i] == NULL){
+            page_table[i] = mem_iter;
+            mem_iter += (4*1024);
+            threadCB->page_id = i;
+            break;
+        }
+        else
+            i++;
+    }
 
     makecontext(&(threadCB->thread_context),(void (*)(void))&helper,2,function,arg);
 
@@ -451,7 +467,8 @@ int my_pthread_yield() {
 void my_pthread_exit(void *value_ptr) {
   //printf("\n-----Exit called-----\n");
   sigprocmask(SIG_BLOCK,&signalMask,NULL);
-  tcb_ptr currentThread= getCurrentBlock(queue);
+  tcb_ptr currentThread = getCurrentBlock(queue);
+  page_table[currentThread->page_id] = NULL;    // delete page table entry
   finishedThread_ptr finishedThread = getCompletedThread();
   if(finishedThread !=NULL && currentThread != NULL) {
     *(finishedThread->returnValue) = value_ptr;
@@ -480,13 +497,12 @@ int my_pthread_join(my_pthread_t thread, void **value_ptr) {
     sigprocmask(SIG_UNBLOCK,&signalMask,NULL);
     if(finishedThread) {
       if(value_ptr)
-	*value_ptr =*(finishedThread->returnValue);
+	     *value_ptr =*(finishedThread->returnValue);
       free(finishedThread);
       return 0;
     }
     else
       return -1;
-
   }
 
   //printf("\n Value is %d :",(joinThread->blockedThreads==NULL));
@@ -502,7 +518,7 @@ int my_pthread_join(my_pthread_t thread, void **value_ptr) {
     sigprocmask(SIG_UNBLOCK,&signalMask,NULL);
     if(finishedThread != NULL && value_ptr != NULL) {
       if(value_ptr)
-	*value_ptr=*(finishedThread->returnValue);
+	     *value_ptr=*(finishedThread->returnValue);
       free(finishedThread);
     }
     return 0;
@@ -577,3 +593,17 @@ int my_pthread_mutex_destroy(my_pthread_mutex_t *mutex) {
   mutex->count = -1;
 	return 0;
 };
+
+void* myallocate(int size, , ,){
+    // LinkedList
+
+    node_ptr nodule = malloc(size);
+    nodule.size = size;
+    // head pointer to 32 bytes LL
+    tcb_ptr ...getCurrentBlock;
+    block->next_alloc
+    nodule.data = block->next_alloc;
+    block->next_alloc += size;
+
+    return nodule.data;
+}
