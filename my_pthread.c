@@ -407,6 +407,23 @@ int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*func
 
     // Allocate 4kB entry in page table
     int i=0;
+    if (mem_iter==8*1024*1024){
+      if (free_list==NULL){
+        return NULL;
+      }
+      else{
+        while(int j<MEMORY_SIZE/PAGE_SIZE){
+        if(free_list[i] == NULL){
+            free_list[i] = ;
+             += (4*1024);
+            threadCB->page_id = i;
+            break;
+        }
+        else
+            i++;
+    }
+      }
+    }
     while(i<MEMORY_SIZE/PAGE_SIZE){
         if(page_table[i] == NULL){
             page_table[i] = mem_iter;
@@ -502,6 +519,7 @@ int my_pthread_join(my_pthread_t thread, void **value_ptr) {
     if(finishedThread) {
       if(value_ptr)
 	     *value_ptr =*(finishedThread->returnValue);
+      page_table[joinThread->page_id]=NULL;
       free(finishedThread);
       return 0;
     }

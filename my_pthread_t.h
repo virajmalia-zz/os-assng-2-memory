@@ -30,6 +30,7 @@ typedef uint my_pthread_t;
 char memory[MEMORY_SIZE] = {0};     // 8MB memory
 char* mem_iter = memory;
 char* page_table[2048] = {NULL};
+char* free_list[2048] = {NULL};
 
 // 32 bytes
 typedef struct node{
