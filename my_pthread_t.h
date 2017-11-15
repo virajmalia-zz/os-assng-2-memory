@@ -22,18 +22,14 @@
 #define MAXTHREADS 20
 #define MEMORY_SIZE 8 * 1024 * 1024
 #define PAGE_SIZE sysconf(_SC_PAGE_SIZE)
-
-bool MY_MALLOC = 0;
-
-#define malloc(x) myallocate(x, __FILE__, __LINE__, MY_MALLOC)
-#define free(x) mydeallocate(x, __FILE__, __LINE__, MY_MALLOC)
+#define THREAD_REQ 1
+//#define LIBRARY_REQ 2
 
 // Globals
 typedef uint my_pthread_t;
-char* memory = (char*) malloc(MEMORY_SIZE*sizeof(char));     // 8MB memory
+char memory[MEMORY_SIZE] = {0};     // 8MB memory
 char* mem_iter = memory;
-char** page_table = malloc( sizeof(char*) * (MEMORY_SIZE / PAGE_SIZE) );
-page_table = NULL;
+char* page_table[2048] = {NULL};
 
 // 32 bytes
 typedef struct node{
@@ -55,10 +51,10 @@ typedef struct threadControlBlock {
   struct blockedThreadList *blockedThreads;
 
   // Memory related params
-  // Total page size for a thread equals 4kB
+  // Total page size for a thread equals 4KB
   char* next_alloc;                     // Next available location
-  int rem_contig_space = PAGE_SIZE;
-  int rem_total_space = PAGE_SIZE;
+  int rem_contig_space;
+  int rem_total_space;
   int page_id;
   node_ptr head;
   //node_ptr tail;
@@ -107,8 +103,8 @@ blockedThreadList_ptr getBlockedThreadList();
 int addToBlockedThreadList(tcb_ptr,tcb_ptr);
 finishedThread_ptr getCompletedThread();
 finished_Queue getFinishedQueue();
-void* myallocate(int size, int file_num, int line_num, bool alloc_flag);
-void mydeallocate(void* ptr, int file_num, int line_num, bool dealloc_flag);
+void* myallocate(int size, int file_num, int line_num, int alloc_flag);
+void mydeallocate(void* ptr, int file_num, int line_num, int dealloc_flag);
 
 /* Function Declarations: */
 
@@ -150,6 +146,8 @@ int my_pthread_mutex_destroy(my_pthread_mutex_t *mutex);
 #define pthread_mutex_lock my_pthread_mutex_lock
 #define pthread_mutex_unlock my_pthread_mutex_unlock
 #define pthread_mutex_destroy my_pthread_mutex_destroy
+#define malloc(x) myallocate(x, __FILE__, __LINE__, THREAD_REQ)
+#define free(x) mydeallocate(x, __FILE__, __LINE__, THREAD_REQ)
 #endif
 
 #endif

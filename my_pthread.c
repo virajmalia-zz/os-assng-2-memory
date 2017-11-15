@@ -7,7 +7,7 @@
 // iLab Server:
 
 #include "my_pthread_t.h"
-#include <malloc.h>
+//#include <malloc.h>
 #include <sys/time.h>
 #include <signal.h>
 #include <string.h>
@@ -47,6 +47,8 @@ tcb_ptr getControlBlock_Main(){
   controlBlock->next = NULL;
   controlBlock->page_id = -1;
   controlBlock->next_alloc = NULL;
+  controlBlock->rem_contig_space = PAGE_SIZE;
+  controlBlock->rem_total_space = PAGE_SIZE;
 
   return controlBlock;
 
@@ -65,6 +67,8 @@ tcb_ptr getControlBlock(){
   controlBlock->next = NULL ;
   controlBlock->page_id = -1;
   controlBlock->next_alloc = NULL;
+  controlBlock->rem_contig_space = PAGE_SIZE;
+  controlBlock->rem_total_space = PAGE_SIZE;
 
   return controlBlock;
 
@@ -594,7 +598,7 @@ int my_pthread_mutex_destroy(my_pthread_mutex_t *mutex) {
 	return 0;
 };
 
-void* myallocate(int size, int file_num, int line_num, bool alloc_flag){
+void* myallocate(int size, int file_num, int line_num, int alloc_flag){
 
     tcb_ptr block = getCurrentBlock(queue); // get 4kB block
 
@@ -618,8 +622,8 @@ void* myallocate(int size, int file_num, int line_num, bool alloc_flag){
     return nodule->data;
 }
 
-void mydeallocate(void* ptr, int file_num, int line_num, bool dealloc_flag){
-    tcb_ptr nodule = (tcb_ptr) ptr;
+void mydeallocate(void* ptr, int file_num, int line_num, int dealloc_flag){
+    node_ptr nodule = (node_ptr) ptr;
     tcb_ptr block = getCurrentBlock(queue);
 
     *(nodule->data - 1) = *(nodule->next);      // Transfer link
