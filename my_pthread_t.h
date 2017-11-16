@@ -18,12 +18,13 @@
 #include <stdlib.h>
 #include <ucontext.h>
 #include <stdbool.h>
+#include <assert.h>
 #define STACKSIZE 8 * 1024
 #define MAXTHREADS 20
 #define MEMORY_SIZE 8 * 1024 * 1024
 #define PAGE_SIZE sysconf(_SC_PAGE_SIZE)
 #define THREAD_REQ 1
-//#define LIBRARY_REQ 2
+#define LIBRARY_REQ 2
 
 // Globals
 typedef uint my_pthread_t;
@@ -35,12 +36,12 @@ char** free_head = free_list;
 char** free_tail = &free_list[2047];
 
 // 32 bytes
-typedef struct node{
+typedef struct Node{
     int size;
     char* data;
-    char* next; // next byte after allocation
+    struct Node* next; // next byte after allocation
     bool valid;
-}* node_ptr;
+}node,*node_ptr;
 
 typedef struct threadControlBlock {
   // Thread related params
@@ -55,7 +56,7 @@ typedef struct threadControlBlock {
 
   // Memory related params
   // Total page size for a thread equals 4KB
-  //char* next_alloc;                     // Next available location
+  char* next_alloc;                     // Next available location
   //int rem_contig_space;
   int rem_space;
   int page_id;
@@ -66,9 +67,9 @@ typedef struct threadControlBlock {
 
 
   // Internal Free List
-  node_ptr node_list[4096];
-  node_ptr* node_head = node_list;
-  node_ptr* node_tail = &node_list[4095];
+  //node_ptr node_list[4096];
+  //node_ptr* node_head = node_list;
+  //node_ptr* node_tail = &node_list[4095];
 
 } tcb, *tcb_ptr;
 
@@ -115,8 +116,8 @@ blockedThreadList_ptr getBlockedThreadList();
 int addToBlockedThreadList(tcb_ptr,tcb_ptr);
 finishedThread_ptr getCompletedThread();
 finished_Queue getFinishedQueue();
-void* myallocate(int size, int file_num, int line_num, int alloc_flag);
-void mydeallocate(void* ptr, int file_num, int line_num, int dealloc_flag);
+void* myallocate(int size, char* file_num, int line_num, int alloc_flag);
+void mydeallocate(void* ptr, char* file_num, int line_num, int dealloc_flag);
 
 /* Function Declarations: */
 
