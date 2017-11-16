@@ -31,6 +31,8 @@ char memory[MEMORY_SIZE] = {0};     // 8MB memory
 char* mem_iter = memory;
 char* page_table[2048] = {NULL};
 char* free_list[2048] = {NULL};
+char** free_head = free_list;
+char** free_tail = &free_list[2047];
 
 // 32 bytes
 typedef struct node{
@@ -53,12 +55,21 @@ typedef struct threadControlBlock {
 
   // Memory related params
   // Total page size for a thread equals 4KB
-  char* next_alloc;                     // Next available location
-  int rem_contig_space;
-  int rem_total_space;
+  //char* next_alloc;                     // Next available location
+  //int rem_contig_space;
+  int rem_space;
   int page_id;
   node_ptr head;
   //node_ptr tail;
+
+  // Active node list
+
+
+  // Internal Free List
+  node_ptr node_list[4096];
+  node_ptr* node_head = node_list;
+  node_ptr* node_tail = &node_list[4095];
+
 } tcb, *tcb_ptr;
 
 /* mutex struct definition */

@@ -47,11 +47,10 @@ tcb_ptr getControlBlock_Main(){
   controlBlock->next = NULL;
   controlBlock->page_id = -1;
   controlBlock->next_alloc = NULL;
-  controlBlock->rem_contig_space = PAGE_SIZE;
-  controlBlock->rem_total_space = PAGE_SIZE;
+  //controlBlock->rem_contig_space = PAGE_SIZE;
+  controlBlock->rem_space = PAGE_SIZE;
 
   return controlBlock;
-
 }
 
 tcb_ptr getControlBlock(){
@@ -67,11 +66,10 @@ tcb_ptr getControlBlock(){
   controlBlock->next = NULL ;
   controlBlock->page_id = -1;
   controlBlock->next_alloc = NULL;
-  controlBlock->rem_contig_space = PAGE_SIZE;
-  controlBlock->rem_total_space = PAGE_SIZE;
+  //controlBlock->rem_contig_space = PAGE_SIZE;
+  controlBlock->rem_space = PAGE_SIZE;
 
   return controlBlock;
-
 }
 
 int enqueue(thread_Queue queue,tcb_ptr tcb) {
@@ -365,6 +363,7 @@ void my_pthread_init(long period){
   millisec = period;
   tcb_ptr mainThread = getControlBlock_Main();
   mainThread->page_id = 0;
+  mainThread->head = &memory;
   page_table[0] = mem_iter;
   mem_iter += (4*1024);
   //getcontext(&(MainThread->thread_context));
@@ -387,10 +386,11 @@ void my_pthread_init(long period){
 
 /* create a new thread */
 int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*function)(void*), void * arg) {
-    if(first_create){
-        first_create = false;
-        my_pthread_init(25000);
-    }
+  if(first_create){
+    first_create = false;
+    my_pthread_init(25000);
+  }
+  
   int temp;
   if(queue != NULL) {
     sigprocmask(SIG_BLOCK,&signalMask,NULL);
@@ -407,28 +407,37 @@ int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*func
 
     // Allocate 4kB entry in page table
     int i=0;
+    char* temp;
+    bool mem_iter_flag = false;
     if (mem_iter==8*1024*1024){
       if (free_list==NULL){
         return NULL;
       }
       else{
-        while(int j<MEMORY_SIZE/PAGE_SIZE){
-        if(free_list[i] == NULL){
-            free_list[i] = ;
-             += (4*1024);
-            threadCB->page_id = i;
-            break;
-        }
-        else
-            i++;
-    }
+          if(free_head == NULL){
+              free_head = free_list;
+          }
+          else{
+              temp = (*free_head);
+              *free_head = NULL;
+              if(free_head == free_tail)
+                free_head = free_list;
+              else
+                free_head++;
+          }
       }
+    }
+    else{
+        mem_iter_flag = true;
+        temp = mem_iter;
     }
     while(i<MEMORY_SIZE/PAGE_SIZE){
         if(page_table[i] == NULL){
-            page_table[i] = mem_iter;
-            mem_iter += (4*1024);
+            page_table[i] = temp;
+            if(mem_iter_flag)
+                mem_iter += (4*1024);
             threadCB->page_id = i;
+            threadCB->head = temp;
             break;
         }
         else
@@ -459,6 +468,16 @@ void *helper(void *(*function)(void*), void *arg){
     *(finishedThread->returnValue) = returnValue;
     finishedThread->thread_id = currentThread->thread_id;
     enqueueToCompletedList(finishedQueue,finishedThread);
+    int i=0;
+      while(i<MEMORY_SIZE/PAGE_SIZE){
+        if(free_list[i] == NULL){
+          free_list[i] = page_table[currentThread->page_id];
+          break;
+        }
+        else
+          i++;
+      }
+      page_table[currentThread->page_id] = NULL;
   }
   sigprocmask(SIG_UNBLOCK,&signalMask,NULL);
 
@@ -474,7 +493,6 @@ tcb_ptr getCurrentControlBlock_Safe() {
   sigprocmask(SIG_UNBLOCK,&signalMask,NULL);
 
   return currentControlBlock;
-
 }
 
 /* give CPU pocession to other user level threads voluntarily */
@@ -495,6 +513,17 @@ void my_pthread_exit(void *value_ptr) {
     *(finishedThread->returnValue) = value_ptr;
     finishedThread->thread_id = currentThread->thread_id;
     enqueueToCompletedList(finishedQueue,finishedThread);
+    int i=0;
+      while(i<MEMORY_SIZE/PAGE_SIZE){
+        if(free_list[i] == NULL){
+          free_list[i] = page_table[currentThread->page_id];
+          break;
+        }
+        else
+          i++;
+      }
+      page_table[currentThread->page_id] = NULL;
+
   }
   threadCompleted();
   sigprocmask(SIG_UNBLOCK,&signalMask,NULL);
@@ -519,7 +548,6 @@ int my_pthread_join(my_pthread_t thread, void **value_ptr) {
     if(finishedThread) {
       if(value_ptr)
 	     *value_ptr =*(finishedThread->returnValue);
-      page_table[joinThread->page_id]=NULL;
       free(finishedThread);
       return 0;
     }
@@ -619,23 +647,55 @@ int my_pthread_mutex_destroy(my_pthread_mutex_t *mutex) {
 void* myallocate(int size, int file_num, int line_num, int alloc_flag){
 
     tcb_ptr block = getCurrentBlock(queue); // get 4kB block
+    node_ptr nodule = NULL;
 
-    if(size > block->rem_total_space)
+    if(size > block->rem_contig_space || block->next_alloc >= 4096)
         return NULL;
 
-    node_ptr nodule = malloc(size);
+    if(block->head == NULL){
+      block->head = nodule;
+    }
+    node_ptr iter = block->head;
+    node_ptr prev_node;
 
+    while(iter != NULL){
+      prev_node = iter;
+      if(iter->valid){
+        if(iter->next != NULL)
+          iter = iter->next;
+        else
+          iter += iter->size;
+      }
+      else{
+        if(size <= iter->size){
+          // Allocate
+            nodule->data = iter;
+            nodule->size = size;
+            block->rem_space -= size;
+            nodule->valid = 1;
+            if(size < iter->size){
+              int rem_size = iter->size - size;
+              iter += iter->size;
+              char* temp = nodule->next;
+              nodule->next = iter;
+              nodule->next->valid = 0;
+              nodule->next->size = rem_size;
+              nodule->next->next = temp;
+            }
+        }
+        
+      }
+    }
+
+    nodule = iter;
+    nodule->data = iter;
     nodule->size = size;
-    block->rem_contig_space -= size;
-    block->rem_total_space -= size;
-    nodule->data = block->next_alloc;
+    nodule->next = NULL;
     nodule->valid = 1;
-    block->next_alloc += size + 1;
-    nodule->next = block->next_alloc - 1;
-
-    *(nodule->next) = NULL;
+    block->rem_space -= size;
+    
     if(block->head != NULL)
-        *(nodule->next - 1 - nodule->size) = nodule->next - nodule->size;
+      prev_node->next = nodule;
 
     return nodule->data;
 }
@@ -644,8 +704,39 @@ void mydeallocate(void* ptr, int file_num, int line_num, int dealloc_flag){
     node_ptr nodule = (node_ptr) ptr;
     tcb_ptr block = getCurrentBlock(queue);
 
-    *(nodule->data - 1) = *(nodule->next);      // Transfer link
     block->rem_total_space += nodule->size;     // Increase available size
     // rem_contig_space
     nodule->valid = 0;                          // Invalidate nodule
+
+    int i=0;
+    while(i<4096){
+      if(free_list[i] == NULL){
+        free_list[i] = nodule;
+        break;
+      }
+      else
+        i++;
+    }
+    nodule = NULL;
+
+    // Merge contig memory......wait
+    node_ptr iter = block->head;
+    bool prev_invalid = 0;
+    int prev_size = 0;
+    while(iter != NULL){
+      if(prev_invalid){
+        node_ptr temp = iter - prev_size;
+        
+      }
+      if(iter->valid){
+        prev_invalid = 0;
+      }
+      else{
+        prev_invalid = 1;
+        prev_size = iter->size;
+      }
+      iter += iter->size;
+    
+    }
+
 }
