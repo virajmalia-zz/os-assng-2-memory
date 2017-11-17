@@ -28,19 +28,24 @@
 
 // Globals
 typedef uint my_pthread_t;
-char memory[MEMORY_SIZE] = {0};     // 8MB memory
-char* mem_iter = memory;
+char* memory = memalign(PAGE_SIZE, MEMORY_SIZE);     // 8MB memory
+char* mem_head = memory;
+char* mem_iter = mem_head;
+char* kernel_head = memory[4096];
+char* kernel_iter = kernel_head;
+
 char* page_table[2048] = {NULL};
+
 char* free_list[2048] = {NULL};
 char** free_head = free_list;
 char** free_tail = &free_list[2047];
 
 // 32 bytes
 typedef struct Node{
-    int size;
-    char* data;
-    struct Node* next; // next byte after allocation
-    bool valid;
+    int size;       // 4
+    char* data;     // 8
+    struct Node* next; // 8
+    bool valid;     // 1
 }node,*node_ptr;
 
 typedef struct threadControlBlock {
@@ -61,6 +66,8 @@ typedef struct threadControlBlock {
   int rem_space;
   int page_id;
   node_ptr head;
+  char* char_iter;
+  //node_ptr node_iter;
   //node_ptr tail;
 
   // Active node list
@@ -159,8 +166,8 @@ int my_pthread_mutex_destroy(my_pthread_mutex_t *mutex);
 #define pthread_mutex_lock my_pthread_mutex_lock
 #define pthread_mutex_unlock my_pthread_mutex_unlock
 #define pthread_mutex_destroy my_pthread_mutex_destroy
-#define malloc(x) myallocate(x, __FILE__, __LINE__, THREAD_REQ)
-#define free(x) mydeallocate(x, __FILE__, __LINE__, THREAD_REQ)
+//#define malloc(x) myallocate(x, __FILE__, __LINE__, THREAD_REQ)
+//#define free(x) mydeallocate(x, __FILE__, __LINE__, THREAD_REQ)
 #endif
 
 #endif

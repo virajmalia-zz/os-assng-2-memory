@@ -295,35 +295,25 @@ ucontext_t getCommonContext() {
   }
 }
 
-void scheduler(int signum){
+void scheduler(int signum, siginfo_t *si, void *unused){
 
-    int q_size = getQueueSize(queue);
-    bool to_be_removed = 0;
+    if(signum == 26 || signum == 28){
+        int q_size = getQueueSize(queue);
+        bool to_be_removed = 0;
 
-    if(q_size == 1){
-        if( getCurrentBlock(queue)->isExecuted ){
-            // If current context has finished execution, dequeue
-            dequeue(queue);
+        if(q_size == 1){
+            if( getCurrentBlock(queue)->isExecuted ){
+                // If current context has finished execution, dequeue
+                dequeue(queue);
+            }
         }
-    }
-    else if(q_size > 1){
+        else if(q_size > 1){
 
-            tcb_ptr curr_context = getCurrentBlock(queue);
+                tcb_ptr curr_context = getCurrentBlock(queue);
 
-            if( curr_context != NULL ){
-                if( curr_context->isExecuted ){
-                    to_be_removed = 1;
-                    // dequeue
-                    dequeue(queue);
-                }
-                else{
-                    next(queue);
-                }
-
-                tcb_ptr next_context = getCurrentBlock(queue);
-
-                while( next_context != NULL && ( next_context->isBlocked || next_context->isExecuted ) ){
-                    if( next_context->isExecuted ){
+                if( curr_context != NULL ){
+                    if( curr_context->isExecuted ){
+                        to_be_removed = 1;
                         // dequeue
                         dequeue(queue);
                     }
@@ -331,27 +321,45 @@ void scheduler(int signum){
                         next(queue);
                     }
 
-                    next_context = getCurrentBlock(queue);
-                }
+                    tcb_ptr next_context = getCurrentBlock(queue);
 
-                if( next_context == NULL )
-                    return;
+                    while( next_context != NULL && ( next_context->isBlocked || next_context->isExecuted ) ){
+                        if( next_context->isExecuted ){
+                            // dequeue
+                            dequeue(queue);
+                        }
+                        else{
+                            next(queue);
+                        }
 
-                if( next_context != curr_context ){
-                    if( to_be_removed ){
-                        // Set next thread as active, discard current thread
-                        setcontext( &(next_context->thread_context) );
+                        next_context = getCurrentBlock(queue);
                     }
-                    else{
-                        // Swap current thread with next thread
-                        swapcontext(&(curr_context->thread_context), &(next_context->thread_context) );
+
+                    if( next_context == NULL )
+                        return;
+
+                    if( next_context != curr_context ){
+                        if( to_be_removed ){
+                            // Set next thread as active, discard current thread
+                            setcontext( &(next_context->thread_context) );
+                        }
+                        else{
+                            // Swap current thread with next thread
+                            swapcontext(&(curr_context->thread_context), &(next_context->thread_context) );
+                            //mprotect(page_table[curr_context->page_id], PAGE_SIZE, PROT_NONE);  // protect swapped out context
+                            //mprotect(page_table[next_context->page_id], PAGE_SIZE, PROT_READ | PROT_WRITE); // unprotect swapped in context
+                        }
                     }
+
                 }
 
             }
+    }
 
-        }
+    else if(signum == 11){
+        // Memory manager
 
+    }
 }
 
 // init process
@@ -411,7 +419,7 @@ int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*func
     int i=0;
     char* temp;
     bool mem_iter_flag = false;
-    if (mem_iter - &memory[0] == 8*1024*1024){
+    if (mem_iter == kernel_head){
       if (free_list==NULL){
       }
       else{
@@ -432,13 +440,12 @@ int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*func
         mem_iter_flag = true;
         temp = mem_iter;
     }
-    while(i<MEMORY_SIZE/PAGE_SIZE){
+    while(i<4096*1024/PAGE_SIZE){
         if(page_table[i] == NULL){
             page_table[i] = temp;
             if(mem_iter_flag)
                 mem_iter += (4*1024);
             threadCB->page_id = i;
-            //threadCB->head = temp;
             break;
         }
         else
@@ -649,19 +656,29 @@ void* myallocate(int size, char* file_num, int line_num, int alloc_flag){
 
     if(alloc_flag == 1){
         tcb_ptr block = getCurrentBlock(queue); // get 4kB block
-        node_ptr nodule = (node_ptr) myallocate(sizeof(node), __FILE__, __LINE__, LIBRARY_REQ);
+        //node_ptr nodule = (node_ptr) char_iter;
 
         if(size > block->rem_space)
             return NULL;
 
         if(block->head == NULL){
-          block->head = nodule;
+            char_iter = mem_iter;
+            //node_iter = (node_ptr) mem_iter;
+            node_ptr nodule = (node_ptr) char_iter;
+            block->head = nodule;
+            nodule->valid = 1;
+            nodule->size = size;
+            char_iter += sizeof(struct Node);
+            nodule->data = char_iter;
+            nodule->next = NULL;
+            block->rem_space -= size;
+            return nodule->data;
         }
+
         node_ptr iter = block->head;
         //node_ptr prev_node;
 
         while(iter != NULL){
-          //prev_node = iter;
           if(iter->valid){
             if(iter->next != NULL)
               iter = iter->next;
@@ -670,8 +687,12 @@ void* myallocate(int size, char* file_num, int line_num, int alloc_flag){
                 if(size > block->rem_space){
                     return NULL;
                 }
+                char_iter = iter;
+                char_iter += sizeof(struct Node) + iter->size;
+                node_ptr nodule = (node_ptr) char_iter;
                 iter->next = nodule;
-                nodule->data = block->next_alloc;
+                char_iter += sizeof(struct Node);
+                nodule->data = char_iter;
                 nodule->size = size;
                 nodule->next = NULL;
                 nodule->valid = 1;
@@ -682,7 +703,10 @@ void* myallocate(int size, char* file_num, int line_num, int alloc_flag){
           else{
               if(size == iter->size){
                   // Allocate and break
-                  nodule->data = iter->data;
+                  char_iter = iter;
+                  node_ptr nodule = (node_ptr) char_iter;
+                  char_iter += sizeof(struct Node);
+                  nodule->data = char_iter;
                   nodule->size = size;
                   nodule->next = iter->next;
                   nodule->valid = 1;
@@ -691,14 +715,19 @@ void* myallocate(int size, char* file_num, int line_num, int alloc_flag){
               }
               else if(size < iter->size){
                 // Allocate available space and make new pointer for remaining space
-                nodule->data = iter->data;
+                char_iter = iter;
+                node_ptr nodule = (node_ptr) char_iter;
+                char_iter += sizeof(struct Node);
+                nodule->data = char_iter;
                 nodule->size = size;
                 nodule->valid = 1;
                 block->rem_space -= size;
-                node_ptr empty = myallocate(sizeof(node), __FILE__, __LINE__, LIBRARY_REQ);
+                char_iter += size;
+                node_ptr empty = (node_ptr) char_iter;
                 nodule->next = empty;
                 empty->size = iter->size - size;
-                empty->data = iter->data + size;
+                char_iter += sizeof(struct Node);
+                empty->data = char_iter;
                 empty->valid = 0;
                 empty->next = iter->next;
                 break;
@@ -717,28 +746,38 @@ void* myallocate(int size, char* file_num, int line_num, int alloc_flag){
         return nodule->data;
     }
     else if(alloc_flag == 2){
-        // Use system malloc
-        void *p = sbrk(0);
-        void *request = sbrk(size);
-        if(request == (void *)-1)
-            return NULL; //sbrk failed
-        else{
-            assert(p==request); //Not thread safe
-            return p;
+        if(kernel_iter - &memory[0] == 8*1024*1024){
+            return NULL;
         }
+        char* ret_ptr = kernel_iter;
+        kernel_iter += size;    // iterate through instead
+        return ret_ptr;
     }
 }
 
 void mydeallocate(void* ptr, char* file_num, int line_num, int dealloc_flag){
-    char* data = (char*) ptr;
-    tcb_ptr block = getCurrentBlock(queue);
-    node_ptr iter = block->head;
 
-    while(iter->data != data){
-        iter = iter->next;
-        if(iter == NULL)
-            break;
+    if(dealloc_flag == 1){
+        // destroy nodes
+        char* data = (char*) ptr;
+        tcb_ptr block = getCurrentBlock(queue);
+        node_ptr iter = block->head;
+        bool null_flag = 0;
+        while(iter->data != data){
+            iter = iter->next;
+            if(iter == NULL){
+                null_flag = 1;
+                break;
+            }
+        }
+        if(!null_flag){
+            iter->valid = 0;
+            block->rem_space += iter->size;
+        }
     }
-    iter->valid = 0;
-    block->rem_space += iter->size;
+    else if(dealloc_flag == 2){
+        // destroy tcb and 4kb block
+        *ptr = NULL;
+    }
+
 }
