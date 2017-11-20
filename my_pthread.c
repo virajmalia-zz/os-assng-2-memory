@@ -663,7 +663,6 @@ void* myallocate(int size, char* file_num, int line_num, int alloc_flag){
 
         if(block->head == NULL){
             char_iter = mem_iter;
-            //node_iter = (node_ptr) mem_iter;
             node_ptr nodule = (node_ptr) char_iter;
             block->head = nodule;
             nodule->valid = 1;
@@ -749,9 +748,20 @@ void* myallocate(int size, char* file_num, int line_num, int alloc_flag){
         if(kernel_iter - &memory[0] == 8*1024*1024){
             return NULL;
         }
-        char* ret_ptr = kernel_iter;
-        kernel_iter += size;    // iterate through instead
-        return ret_ptr;
+
+        threadNode_ptr iter = (threadNode_ptr) kernel_head;
+        while(iter->next != NULL){
+            iter = iter->next;
+        }
+        kernel_iter = (char*) iter;
+        kernel_iter += sizeof(struct threadContextNode) + iter->size;
+        threadNode_ptr t_node = kernel_iter;
+        t_node->size = size;
+        t_node->next = NULL;
+        kernel_iter += sizeof(struct threadContextNode);
+        t_node->data = kernel_iter;
+
+        return t_node->data;
     }
 }
 

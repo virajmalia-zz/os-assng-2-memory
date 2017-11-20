@@ -40,6 +40,12 @@ char* free_list[2048] = {NULL};
 char** free_head = free_list;
 char** free_tail = &free_list[2047];
 
+typedef struct threadContextNode{
+    int size;
+    char* data;
+    struct threadContextNode* next;
+}threadNode, *threadNode_ptr;
+
 // 32 bytes
 typedef struct Node{
     int size;       // 4
@@ -62,21 +68,10 @@ typedef struct threadControlBlock {
   // Memory related params
   // Total page size for a thread equals 4KB
   char* next_alloc;                     // Next available location
-  //int rem_contig_space;
   int rem_space;
   int page_id;
   node_ptr head;
   char* char_iter;
-  //node_ptr node_iter;
-  //node_ptr tail;
-
-  // Active node list
-
-
-  // Internal Free List
-  //node_ptr node_list[4096];
-  //node_ptr* node_head = node_list;
-  //node_ptr* node_tail = &node_list[4095];
 
 } tcb, *tcb_ptr;
 
