@@ -438,6 +438,9 @@ int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*func
     }
     else{
         mem_iter_flag = true;
+        //ctreating page node and incrementing mem_iter
+        page_ptr nodule = (page_ptr) mem_iter;
+        mem_iter+=sizeof(nodule);
         temp = mem_iter;
     }
     while(i<4096*1024/PAGE_SIZE){
@@ -445,6 +448,10 @@ int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*func
             page_table[i] = temp;
             if(mem_iter_flag)
                 mem_iter += (4*1024);
+            //page[0]=i
+            nodule->page_id[0]=i;
+            nodule->counter +=1;
+            nodule->next= NULL;
             threadCB->page_id = i;
             break;
         }
@@ -659,6 +666,7 @@ void* myallocate(int size, char* file_num, int line_num, int alloc_flag){
         //node_ptr nodule = (node_ptr) char_iter;
 
         if(size > block->rem_space)
+        	//raise raise(SIGSEGV());
             return NULL;
 
         if(block->head == NULL){
