@@ -47,7 +47,6 @@ tcb_ptr getControlBlock_Main(){
   controlBlock->next = NULL;
   controlBlock->page_id = -1;
   controlBlock->next_alloc = NULL;
-  //controlBlock->rem_contig_space = PAGE_SIZE;
   controlBlock->rem_space = PAGE_SIZE;
   controlBlock->head = NULL;
 
@@ -67,7 +66,6 @@ tcb_ptr getControlBlock(){
   controlBlock->next = NULL ;
   controlBlock->page_id = -1;
   controlBlock->next_alloc = NULL;
-  //controlBlock->rem_contig_space = PAGE_SIZE;
   controlBlock->rem_space = PAGE_SIZE;
   controlBlock->head = NULL;
 
@@ -346,8 +344,10 @@ void scheduler(int signum, siginfo_t *si, void *unused){
                         else{
                             // Swap current thread with next thread
                             swapcontext(&(curr_context->thread_context), &(next_context->thread_context) );
-                            //mprotect(page_table[curr_context->page_id], PAGE_SIZE, PROT_NONE);  // protect swapped out context
-                            //mprotect(page_table[next_context->page_id], PAGE_SIZE, PROT_READ | PROT_WRITE); // unprotect swapped in context
+
+                            mprotect(page_table[curr_context->page_id], PAGE_SIZE, PROT_NONE);  // disallow access to swapped out context
+                            mprotect(page_table[next_context->page_id], PAGE_SIZE, PROT_READ | PROT_WRITE); // allow access to swapped in context
+                            mprotect(shared_head, PAGE_SIZE * 4, PROT_READ | PROT_WRITE); // allow access to shared space
                         }
                     }
 

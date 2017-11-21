@@ -37,18 +37,19 @@ char* shared_head = memory[8372224];                // 8MB - 16kB
 char* shared_iter = shared_head;
 size_t rem_shared_space = 16*1024;
 
-// 32 bytes
+// Data nodes in the list
 typedef struct Node{
-    int size;       // 4
-    char* data;     // 8
-    struct Node* next; // 8
-    bool valid;     // 1
+    int size;
+    char* data;
+    struct Node* next;
+    bool valid;
 }node,*node_ptr;
 
-node_ptr sh_list_head = NULL;
+node_ptr sh_list_head = NULL;   // shared list head
 
 char* page_table[2048] = {NULL};
 
+// Free List
 char* free_list[2048] = {NULL};
 char** free_head = free_list;
 char** free_tail = &free_list[2047];
