@@ -791,3 +791,91 @@ void mydeallocate(void* ptr, char* file_num, int line_num, int dealloc_flag){
     }
 
 }
+
+void* shalloc(size_t size){
+
+    if(size > rem_shared_space)
+        return NULL;
+
+    if(sh_list_head == NULL){
+        char_iter = shared_head;
+        node_ptr nodule = (node_ptr) char_iter;
+        sh_list_head = nodule;
+        nodule->valid = 1;
+        nodule->size = size;
+        char_iter += sizeof(struct Node);
+        nodule->data = char_iter;
+        nodule->next = NULL;
+        block->rem_space -= size;
+        return nodule->data;
+    }
+
+    node_ptr iter = sh_list_head;
+
+    while(iter != NULL){
+      if(iter->valid){
+        if(iter->next != NULL)
+          iter = iter->next;
+        else{
+            // Current Valid and next is NULL
+            if(size > rem_shared_space){
+                return NULL;
+            }
+            char_iter = iter;
+            char_iter += sizeof(struct Node) + iter->size;
+            node_ptr nodule = (node_ptr) char_iter;
+            iter->next = nodule;
+            char_iter += sizeof(struct Node);
+            nodule->data = char_iter;
+            nodule->size = size;
+            nodule->next = NULL;
+            nodule->valid = 1;
+            rem_shared_space -= size;
+            break;
+        }
+      }
+      else{
+          if(size == iter->size){
+              // Allocate and break
+              char_iter = iter;
+              node_ptr nodule = (node_ptr) char_iter;
+              char_iter += sizeof(struct Node);
+              nodule->data = char_iter;
+              nodule->size = size;
+              nodule->next = iter->next;
+              nodule->valid = 1;
+              block->rem_space -= size;
+              break;
+          }
+          else if(size < iter->size){
+            // Allocate available space and make new pointer for remaining space
+            char_iter = iter;
+            node_ptr nodule = (node_ptr) char_iter;
+            char_iter += sizeof(struct Node);
+            nodule->data = char_iter;
+            nodule->size = size;
+            nodule->valid = 1;
+            block->rem_space -= size;
+            char_iter += size;
+            node_ptr empty = (node_ptr) char_iter;
+            nodule->next = empty;
+            empty->size = iter->size - size;
+            char_iter += sizeof(struct Node);
+            empty->data = char_iter;
+            empty->valid = 0;
+            empty->next = iter->next;
+            break;
+        }
+        else{
+            // node invalid, requested size > available size
+            iter = iter->next;
+        }
+      }
+    }
+
+    if(iter == NULL){
+        return NULL;
+    }
+
+    return nodule->data;
+}

@@ -31,8 +31,21 @@ typedef uint my_pthread_t;
 char* memory = memalign(PAGE_SIZE, MEMORY_SIZE);     // 8MB memory
 char* mem_head = memory;
 char* mem_iter = mem_head;
-char* kernel_head = memory[4096];
+char* kernel_head = memory[4096*1024*1024];         // Pointer at second set of 4MB
 char* kernel_iter = kernel_head;
+char* shared_head = memory[8372224];                // 8MB - 16kB
+char* shared_iter = shared_head;
+size_t rem_shared_space = 16*1024;
+
+// 32 bytes
+typedef struct Node{
+    int size;       // 4
+    char* data;     // 8
+    struct Node* next; // 8
+    bool valid;     // 1
+}node,*node_ptr;
+
+node_ptr sh_list_head = NULL;
 
 char* page_table[2048] = {NULL};
 
@@ -45,14 +58,6 @@ typedef struct threadContextNode{
     char* data;
     struct threadContextNode* next;
 }threadNode, *threadNode_ptr;
-
-// 32 bytes
-typedef struct Node{
-    int size;       // 4
-    char* data;     // 8
-    struct Node* next; // 8
-    bool valid;     // 1
-}node,*node_ptr;
 
 typedef struct threadControlBlock {
   // Thread related params
