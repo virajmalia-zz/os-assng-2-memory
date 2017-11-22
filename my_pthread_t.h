@@ -48,6 +48,12 @@ typedef struct Node{
     bool valid;     // 1
 }node,*node_ptr;
 
+typedef struct PageNode{
+	int counter;
+	int page_id;
+    struct Node* next; // 8
+}page_node,*page_ptr;
+
 typedef struct threadControlBlock {
   // Thread related params
   my_pthread_t thread_id;
@@ -64,7 +70,9 @@ typedef struct threadControlBlock {
   char* next_alloc;                     // Next available location
   //int rem_contig_space;
   int rem_space;
-  int page_id;
+  //changed page_id to array
+  int page_id[1024];
+  int count;
   node_ptr head;
   char* char_iter;
   //node_ptr node_iter;
