@@ -357,21 +357,65 @@ void scheduler(int signum, siginfo_t *si, void *unused){
     }
 
     else if(signum == 11){
-        // Memory manager
-        int count=0;
-        int* address = si->si_addr;
-        while(address>(4*1024)){
-        	address-=(4*1024);
-        	count++;
+      // Memory manager
+      int flag=0;
+      int* address = si->si_addr;
+      tcb_ptr  threadCB= getCurrentBlock(queue);
+      for(int i = 0; i<=threadCB->count; i++){
+        int* limit = threadCB->page_id[cnt];
+        limit += 4*1024;
+        if(address >= page_table[(threadCB->page_id[cnt])] || address < limit) {
+        //page already exists -> swap file
+          flag = 1;
+          if()
         }
-        tcb_ptr  threadCB= getCurrentBlock(queue);
-        if (count<=threadCB->count){
-        	//page already exists
+      }
+      if(flag == 0){
+        //allocate new page
+        int i=0;
+        char* temp;
+        bool mem_iter_flag = false;
+        if (mem_iter == kernel_head){
+          if (free_list==NULL){
+          }
+          else{
+              if(free_head == NULL){
+                  free_head = free_list;
+              }
+              else{
+                  temp = (*free_head);
+                  *free_head = NULL;
+                  if(free_head == free_tail)
+                    free_head = free_list;
+                  else
+                    free_head++;
+              }
+          }
         }
         else{
-        	//allocate new page
+            mem_iter_flag = true;
+            //ctreating page node and incrementing mem_iter
+            page_ptr nodule = (page_ptr) mem_iter;
+            nodule->counter = 1;
+            nodule->next= NULL;
+            mem_iter+=sizeof(nodule);
+            temp = mem_iter;
         }
-
+        while(i<4096*1024/PAGE_SIZE){
+            if(page_table[i] == NULL){
+                page_table[i] = temp;
+                if(mem_iter_flag)
+                    mem_iter += (4*1024);
+                //page[0]=i
+                threadCB->count++;
+                threadCB->page_id[threadCB->count]=i;
+                nodule->th_id = threadCB->thread_id;
+                break;
+            }
+            else
+                i++;
+        }
+      }
     }
 }
 
@@ -387,13 +431,20 @@ void my_pthread_init(long period){
   tcb_ptr mainThread = getControlBlock_Main();
   mainThread->page_id = 0;
   //mainThread->head = &memory;
+  page_ptr nodule = (page_ptr) mem_iter;
+  nodule->counter = 1;
+  nodule->next= NULL;
+  mem_iter+=sizeof(nodule);
   page_table[0] = mem_iter;
   mem_iter += (4*1024);
+  mainThread->page_id[0]=i;
+  mainThread->count=1;
   //getcontext(&(MainThread->thread_context));
   //printf("in init \n");
   getCommonContext();
   mainThread->thread_context.uc_link = &common_context;
   mainThread->thread_id = threadid;
+  nodule->th_id = mainThread->thread_id;
   enqueue(queue,mainThread);
   memset(&scheduler_interrupt_handler, 0, sizeof (scheduler_interrupt_handler));
   scheduler_interrupt_handler.sa_handler= &scheduler;
@@ -453,7 +504,7 @@ int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*func
         mem_iter_flag = true;
         //ctreating page node and incrementing mem_iter
         page_ptr nodule = (page_ptr) mem_iter;
-        nodule->counter +=1;
+        nodule->counter = 1;
         nodule->next= NULL;
         mem_iter+=sizeof(nodule);
         temp = mem_iter;
@@ -466,8 +517,7 @@ int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*func
             //page[0]=i
             threadCB->page_id[0]=i;
             threadCB->count=1;
-            nodule->page_id=i;
-            threadCB->page_id = i;
+            nodule->th_id = threadCB->thread_id;
             break;
         }
         else

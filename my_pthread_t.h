@@ -50,8 +50,8 @@ typedef struct Node{
 
 typedef struct PageNode{
 	int counter;
-	int page_id;
-    struct Node* next; // 8
+	int th_id;
+  struct PageNode* next;
 }page_node,*page_ptr;
 
 typedef struct threadControlBlock {
