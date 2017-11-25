@@ -902,3 +902,31 @@ void* shalloc(size_t size){
 
     return nodule->data;
 }
+
+int naive_replacement(){
+	int min_counter = INT_MAX;
+	mem_iter = head;
+	int page_to_evict = mem_iter->page_id;
+	while(mem_iter!=kernel_head){
+		if (min_counter > mem_iter->counter)
+		{
+			min_counter = mem_iter->counter;
+			page_to_evict = mem_iter->page_id;
+		}
+    mem_iter+=4096;
+	}
+	return page_id
+}
+
+int chance2_replacement(){
+  mem_iter = head;
+  while(1){
+    if (mem_iter->used_bit==0){
+      return mem_iter->page_id;
+    }
+    else {
+      mem_iter->used_bit=0;
+    }
+    mem_iter = (mem_iter+4096)%(4*1024*1024);
+  }
+}
