@@ -14,6 +14,7 @@
 #include <unistd.h>
 #include <sys/syscall.h>
 #include <sys/types.h>
+#include <malloc.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <ucontext.h>
@@ -28,13 +29,15 @@
 
 // Globals
 typedef uint my_pthread_t;
-char* memory = memalign(PAGE_SIZE, MEMORY_SIZE);     // 8MB memory
+char* memory = malloc(sizeof(8*1024*1024));
+memory = memalign(PAGE_SIZE, MEMORY_SIZE);     // 8MB memory
 char* mem_head = memory;
 char* mem_iter = mem_head;
 char* kernel_head = memory[4096*1024*1024];         // Pointer at second set of 4MB
 char* kernel_iter = kernel_head;
 char* shared_head = memory[8372224];                // 8MB - 16kB
 char* shared_iter = shared_head;
+char* shared_char_iter;
 size_t rem_shared_space = 16*1024;
 
 // Data nodes in the list
@@ -44,6 +47,12 @@ typedef struct Node{
     struct Node* next;
     bool valid;
 }node,*node_ptr;
+
+typedef struct PageNode{
+	int counter;
+	int th_id;
+  struct PageNode* next;
+}page_node,*page_ptr;
 
 node_ptr sh_list_head = NULL;   // shared list head
 
@@ -68,6 +77,7 @@ typedef struct threadControlBlock {
   int isExecuted;
   int isBlocked;
   int isMain;
+  int count;
   struct threadControlBlock *next;
   struct blockedThreadList *blockedThreads;
 
@@ -126,6 +136,7 @@ finishedThread_ptr getCompletedThread();
 finished_Queue getFinishedQueue();
 void* myallocate(int size, char* file_num, int line_num, int alloc_flag);
 void mydeallocate(void* ptr, char* file_num, int line_num, int dealloc_flag);
+void* shalloc(size_t size);
 
 /* Function Declarations: */
 

@@ -357,8 +357,66 @@ void scheduler(int signum, siginfo_t *si, void *unused){
     }
 
     else if(signum == 11){
-        // Memory manager
-
+      // Memory manager
+      int flag=0;
+      int* address = si->si_addr;
+      tcb_ptr  threadCB= getCurrentBlock(queue);
+      for(int i = 0; i<=threadCB->count; i++){
+        int* limit = threadCB->page_id[cnt];
+        limit += 4*1024;
+        if(address >= page_table[(threadCB->page_id[cnt])] || address < limit) {
+        //page already exists -> swap file
+          flag = 1;
+          //if()
+        }
+      }
+      if(flag == 0){
+        //allocate new page
+        int i=0;
+        char* temp;
+        bool mem_iter_flag = false;
+        if (mem_iter == kernel_head){
+          if (free_list==NULL){
+          }
+          else{
+              if(free_head == NULL){
+                  free_head = free_list;
+              }
+              else{
+                  temp = (*free_head);
+                  *free_head = NULL;
+                  if(free_head == free_tail)
+                    free_head = free_list;
+                  else
+                    free_head++;
+              }
+          }
+        }
+        else{
+            mem_iter_flag = true;
+            //creating page node and incrementing mem_iter
+            page_ptr nodule = (page_ptr) mem_iter;
+            nodule->counter = 1;
+            nodule->next= NULL;
+            mem_iter+=sizeof(nodule);
+            temp = mem_iter;
+        }
+        while(i<4096*1024/PAGE_SIZE){
+            if(page_table[i] == NULL){
+                page_table[i] = temp;
+                if(mem_iter_flag){
+                    nodule->th_id = threadCB->thread_id;
+                    mem_iter += (4*1024);
+                }
+                //page[0]=i
+                threadCB->count++;
+                threadCB->page_id[threadCB->count] = i;
+                break;
+            }
+            else
+                i++;
+        }
+      }
     }
 }
 
@@ -787,7 +845,7 @@ void mydeallocate(void* ptr, char* file_num, int line_num, int dealloc_flag){
     }
     else if(dealloc_flag == 2){
         // destroy tcb and 4kb block
-        *ptr = NULL;
+        *ptr = (char*)NULL;
     }
 
 }
@@ -798,15 +856,15 @@ void* shalloc(size_t size){
         return NULL;
 
     if(sh_list_head == NULL){
-        char_iter = shared_head;
-        node_ptr nodule = (node_ptr) char_iter;
+        shared_char_iter = shared_head;
+        node_ptr nodule = (node_ptr) shared_char_iter;
         sh_list_head = nodule;
         nodule->valid = 1;
         nodule->size = size;
-        char_iter += sizeof(struct Node);
-        nodule->data = char_iter;
+        shared_char_iter += sizeof(struct Node);
+        nodule->data = shared_char_iter;
         nodule->next = NULL;
-        block->rem_space -= size;
+        rem_shared_space -= size;
         return nodule->data;
     }
 
@@ -821,12 +879,12 @@ void* shalloc(size_t size){
             if(size > rem_shared_space){
                 return NULL;
             }
-            char_iter = iter;
-            char_iter += sizeof(struct Node) + iter->size;
-            node_ptr nodule = (node_ptr) char_iter;
+            shared_char_iter = (char*) iter;
+            shared_char_iter += sizeof(struct Node) + iter->size;
+            node_ptr nodule = (node_ptr) shared_char_iter;
             iter->next = nodule;
-            char_iter += sizeof(struct Node);
-            nodule->data = char_iter;
+            shared_char_iter += sizeof(struct Node);
+            nodule->data = shared_char_iter;
             nodule->size = size;
             nodule->next = NULL;
             nodule->valid = 1;
@@ -837,31 +895,31 @@ void* shalloc(size_t size){
       else{
           if(size == iter->size){
               // Allocate and break
-              char_iter = iter;
-              node_ptr nodule = (node_ptr) char_iter;
-              char_iter += sizeof(struct Node);
-              nodule->data = char_iter;
+              shared_char_iter = (char*) iter;
+              node_ptr nodule = (node_ptr) shared_char_iter;
+              shared_char_iter += sizeof(struct Node);
+              nodule->data = shared_char_iter;
               nodule->size = size;
               nodule->next = iter->next;
               nodule->valid = 1;
-              block->rem_space -= size;
+              rem_shared_space -= size;
               break;
           }
           else if(size < iter->size){
             // Allocate available space and make new pointer for remaining space
-            char_iter = iter;
-            node_ptr nodule = (node_ptr) char_iter;
-            char_iter += sizeof(struct Node);
-            nodule->data = char_iter;
+            shared_char_iter = (char*) iter;
+            node_ptr nodule = (node_ptr) shared_char_iter;
+            shared_char_iter += sizeof(struct Node);
+            nodule->data = shared_char_iter;
             nodule->size = size;
             nodule->valid = 1;
-            block->rem_space -= size;
-            char_iter += size;
-            node_ptr empty = (node_ptr) char_iter;
+            rem_shared_space -= size;
+            shared_char_iter += size;
+            node_ptr empty = (node_ptr) shared_char_iter;
             nodule->next = empty;
             empty->size = iter->size - size;
-            char_iter += sizeof(struct Node);
-            empty->data = char_iter;
+            shared_char_iter += sizeof(struct Node);
+            empty->data = shared_char_iter;
             empty->valid = 0;
             empty->next = iter->next;
             break;
