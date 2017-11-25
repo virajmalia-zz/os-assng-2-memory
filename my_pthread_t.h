@@ -31,22 +31,34 @@ typedef uint my_pthread_t;
 char* memory = memalign(PAGE_SIZE, MEMORY_SIZE);     // 8MB memory
 char* mem_head = memory;
 char* mem_iter = mem_head;
-char* kernel_head = memory[4096];
+char* kernel_head = memory[4096*1024*1024];         // Pointer at second set of 4MB
 char* kernel_iter = kernel_head;
+char* shared_head = memory[8372224];                // 8MB - 16kB
+char* shared_iter = shared_head;
+size_t rem_shared_space = 16*1024;
+
+// Data nodes in the list
+typedef struct Node{
+    int size;
+    char* data;
+    struct Node* next;
+    bool valid;
+}node,*node_ptr;
+
+node_ptr sh_list_head = NULL;   // shared list head
 
 char* page_table[2048] = {NULL};
 
+// Free List
 char* free_list[2048] = {NULL};
 char** free_head = free_list;
 char** free_tail = &free_list[2047];
 
-// 32 bytes
-typedef struct Node{
-    int size;       // 4
-    char* data;     // 8
-    struct Node* next; // 8
-    bool valid;     // 1
-}node,*node_ptr;
+typedef struct threadContextNode{
+    int size;
+    char* data;
+    struct threadContextNode* next;
+}threadNode, *threadNode_ptr;
 
 typedef struct PageNode{
 	int counter;
@@ -68,23 +80,12 @@ typedef struct threadControlBlock {
   // Memory related params
   // Total page size for a thread equals 4KB
   char* next_alloc;                     // Next available location
-  //int rem_contig_space;
   int rem_space;
   //changed page_id to array
   int page_id[1024];
   int count;
   node_ptr head;
   char* char_iter;
-  //node_ptr node_iter;
-  //node_ptr tail;
-
-  // Active node list
-
-
-  // Internal Free List
-  //node_ptr node_list[4096];
-  //node_ptr* node_head = node_list;
-  //node_ptr* node_tail = &node_list[4095];
 
 } tcb, *tcb_ptr;
 

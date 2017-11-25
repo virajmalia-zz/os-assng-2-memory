@@ -47,7 +47,6 @@ tcb_ptr getControlBlock_Main(){
   controlBlock->next = NULL;
   controlBlock->page_id = -1;
   controlBlock->next_alloc = NULL;
-  //controlBlock->rem_contig_space = PAGE_SIZE;
   controlBlock->rem_space = PAGE_SIZE;
   controlBlock->head = NULL;
 
@@ -67,7 +66,6 @@ tcb_ptr getControlBlock(){
   controlBlock->next = NULL ;
   controlBlock->page_id = -1;
   controlBlock->next_alloc = NULL;
-  //controlBlock->rem_contig_space = PAGE_SIZE;
   controlBlock->rem_space = PAGE_SIZE;
   controlBlock->head = NULL;
 
@@ -346,8 +344,10 @@ void scheduler(int signum, siginfo_t *si, void *unused){
                         else{
                             // Swap current thread with next thread
                             swapcontext(&(curr_context->thread_context), &(next_context->thread_context) );
-                            //mprotect(page_table[curr_context->page_id], PAGE_SIZE, PROT_NONE);  // protect swapped out context
-                            //mprotect(page_table[next_context->page_id], PAGE_SIZE, PROT_READ | PROT_WRITE); // unprotect swapped in context
+
+                            mprotect(page_table[curr_context->page_id], PAGE_SIZE, PROT_NONE);  // disallow access to swapped out context
+                            mprotect(page_table[next_context->page_id], PAGE_SIZE, PROT_READ | PROT_WRITE); // allow access to swapped in context
+                            mprotect(shared_head, PAGE_SIZE * 4, PROT_READ | PROT_WRITE); // allow access to shared space
                         }
                     }
 
@@ -686,7 +686,6 @@ void* myallocate(int size, char* file_num, int line_num, int alloc_flag){
 
         if(block->head == NULL){
             char_iter = mem_iter;
-            //node_iter = (node_ptr) mem_iter;
             node_ptr nodule = (node_ptr) char_iter;
             block->head = nodule;
             nodule->valid = 1;
@@ -772,9 +771,20 @@ void* myallocate(int size, char* file_num, int line_num, int alloc_flag){
         if(kernel_iter - &memory[0] == 8*1024*1024){
             return NULL;
         }
-        char* ret_ptr = kernel_iter;
-        kernel_iter += size;    // iterate through instead
-        return ret_ptr;
+
+        threadNode_ptr iter = (threadNode_ptr) kernel_head;
+        while(iter->next != NULL){
+            iter = iter->next;
+        }
+        kernel_iter = (char*) iter;
+        kernel_iter += sizeof(struct threadContextNode) + iter->size;
+        threadNode_ptr t_node = kernel_iter;
+        t_node->size = size;
+        t_node->next = NULL;
+        kernel_iter += sizeof(struct threadContextNode);
+        t_node->data = kernel_iter;
+
+        return t_node->data;
     }
 }
 
@@ -803,4 +813,92 @@ void mydeallocate(void* ptr, char* file_num, int line_num, int dealloc_flag){
         *ptr = NULL;
     }
 
+}
+
+void* shalloc(size_t size){
+
+    if(size > rem_shared_space)
+        return NULL;
+
+    if(sh_list_head == NULL){
+        char_iter = shared_head;
+        node_ptr nodule = (node_ptr) char_iter;
+        sh_list_head = nodule;
+        nodule->valid = 1;
+        nodule->size = size;
+        char_iter += sizeof(struct Node);
+        nodule->data = char_iter;
+        nodule->next = NULL;
+        block->rem_space -= size;
+        return nodule->data;
+    }
+
+    node_ptr iter = sh_list_head;
+
+    while(iter != NULL){
+      if(iter->valid){
+        if(iter->next != NULL)
+          iter = iter->next;
+        else{
+            // Current Valid and next is NULL
+            if(size > rem_shared_space){
+                return NULL;
+            }
+            char_iter = iter;
+            char_iter += sizeof(struct Node) + iter->size;
+            node_ptr nodule = (node_ptr) char_iter;
+            iter->next = nodule;
+            char_iter += sizeof(struct Node);
+            nodule->data = char_iter;
+            nodule->size = size;
+            nodule->next = NULL;
+            nodule->valid = 1;
+            rem_shared_space -= size;
+            break;
+        }
+      }
+      else{
+          if(size == iter->size){
+              // Allocate and break
+              char_iter = iter;
+              node_ptr nodule = (node_ptr) char_iter;
+              char_iter += sizeof(struct Node);
+              nodule->data = char_iter;
+              nodule->size = size;
+              nodule->next = iter->next;
+              nodule->valid = 1;
+              block->rem_space -= size;
+              break;
+          }
+          else if(size < iter->size){
+            // Allocate available space and make new pointer for remaining space
+            char_iter = iter;
+            node_ptr nodule = (node_ptr) char_iter;
+            char_iter += sizeof(struct Node);
+            nodule->data = char_iter;
+            nodule->size = size;
+            nodule->valid = 1;
+            block->rem_space -= size;
+            char_iter += size;
+            node_ptr empty = (node_ptr) char_iter;
+            nodule->next = empty;
+            empty->size = iter->size - size;
+            char_iter += sizeof(struct Node);
+            empty->data = char_iter;
+            empty->valid = 0;
+            empty->next = iter->next;
+            break;
+        }
+        else{
+            // node invalid, requested size > available size
+            iter = iter->next;
+        }
+      }
+    }
+
+    if(iter == NULL){
+        return NULL;
+    }
+
+    return nodule->data;
 }
