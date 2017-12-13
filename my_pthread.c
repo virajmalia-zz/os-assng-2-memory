@@ -425,6 +425,16 @@ void my_pthread_init(long period){
   threadid = 1;
   sigemptyset(&signalMask);
   sigaddset(&signalMask, SIGVTALRM);
+  memory = (void*) memalign (PAGE_SIZE, MEMORY_SIZE);
+
+  mem_head = memory;
+  mem_iter = mem_head;
+  kernel_head = memory[4096*1024*1024];         // Pointer at second set of 4MB
+  kernel_iter = kernel_head;
+  shared_head = memory[8372224];                // 8MB - 16kB
+  shared_iter = shared_head;
+  shared_char_iter;
+
   //intializing the context of the scheduler
   finishedQueue = getFinishedQueue();
   queue = getQueue();

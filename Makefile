@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -g -c
+CFLAGS = -g -c -w
 AR = ar -rc
 RANLIB = ranlib
 
