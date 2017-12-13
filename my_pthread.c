@@ -362,9 +362,9 @@ void scheduler(int signum, siginfo_t *si, void *unused){
       int* address = si->si_addr;
       tcb_ptr  threadCB= getCurrentBlock(queue);
       for(int i = 0; i<=threadCB->count; i++){
-        int* limit = threadCB->page_id[cnt];
+        int* limit = threadCB->page_id[count];
         limit += 4*1024;
-        if(address >= page_table[(threadCB->page_id[cnt])] || address < limit) {
+        if(address >= page_table[(threadCB->page_id[count])] || address < limit) {
         //page already exists -> swap file
           flag = 1;
           //if()
@@ -425,6 +425,16 @@ void my_pthread_init(long period){
   threadid = 1;
   sigemptyset(&signalMask);
   sigaddset(&signalMask, SIGVTALRM);
+  memory = (void*) memalign (PAGE_SIZE, MEMORY_SIZE);
+
+  mem_head = memory;
+  mem_iter = mem_head;
+  kernel_head = memory[4096*1024*1024];         // Pointer at second set of 4MB
+  kernel_iter = kernel_head;
+  shared_head = memory[8372224];                // 8MB - 16kB
+  shared_iter = shared_head;
+  shared_char_iter;
+
   //intializing the context of the scheduler
   finishedQueue = getFinishedQueue();
   queue = getQueue();
@@ -442,6 +452,19 @@ void my_pthread_init(long period){
   enqueue(queue,mainThread);
   memset(&scheduler_interrupt_handler, 0, sizeof (scheduler_interrupt_handler));
   scheduler_interrupt_handler.sa_handler= &scheduler;
+
+  // struct sigaction sa;
+  scheduler_interrupt_handler.sa_flags = SA_SIGINFO;
+  sigemptyset(&scheduler_interrupt_handler.sa_mask);
+
+  scheduler_interrupt_handler.sa_sigaction = scheduler;
+
+  if (sigaction(SIGSEGV, &scheduler_interrupt_handler, NULL) == -1)
+  {
+      printf("Fatal error setting up signal handler\n");
+      exit(EXIT_FAILURE);    //explode!
+  }
+
   sigaction(SIGVTALRM,&scheduler_interrupt_handler,NULL);
   millisec = period;
   timeslice.it_value.tv_sec = 0;

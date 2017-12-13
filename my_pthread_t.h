@@ -9,12 +9,12 @@
 #define MY_PTHREAD_T_H
 
 #define _GNU_SOURCE
-
+#include <stdlib.h>
 #define USE_MY_PTHREAD 1
 #include <unistd.h>
 #include <sys/syscall.h>
 #include <sys/types.h>
-#include <malloc.h>
+//#include <malloc.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <ucontext.h>
@@ -29,15 +29,26 @@
 
 // Globals
 typedef uint my_pthread_t;
-char* memory = malloc(sizeof(8*1024*1024));
-memory = memalign(PAGE_SIZE, MEMORY_SIZE);     // 8MB memory
-char* mem_head = memory;
-char* mem_iter = mem_head;
-char* kernel_head = memory[4096*1024*1024];         // Pointer at second set of 4MB
-char* kernel_iter = kernel_head;
-char* shared_head = memory[8372224];                // 8MB - 16kB
-char* shared_iter = shared_head;
+// char* memory = malloc(sizeof(8*1024*1024));
+// memory = memalign(PAGE_SIZE, MEMORY_SIZE);     // 8MB memory1
+void* memory = NULL;
+
+char* mem_head = NULL;
+char* mem_iter = NULL;
+void* kernel_head = NULL;       // Pointer at second set
+char* kernel_iter = NULL;
+void* shared_head = NULL;              // 8MB
+char* shared_iter = NULL;
 char* shared_char_iter;
+
+// memory = (void*) memalign (PAGE_SIZE, MEMORY_SIZE) ;
+// char* mem_head = memory;
+// char* mem_iter = mem_head;
+// char* kernel_head = memory[4096*1024*1024];         // Pointer at second set of 4MB
+// char* kernel_iter = kernel_head;
+// char* shared_head = memory[8372224];                // 8MB - 16kB
+// char* shared_iter = shared_head;
+// char* shared_char_iter;
 size_t rem_shared_space = 16*1024;
 
 // Data nodes in the list
