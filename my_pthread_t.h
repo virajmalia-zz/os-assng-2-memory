@@ -35,9 +35,9 @@ void* memory = NULL;
 
 char* mem_head = NULL;
 char* mem_iter = NULL;
-char* kernel_head = NULL;       // Pointer at second set
+void* kernel_head = NULL;       // Pointer at second set
 char* kernel_iter = NULL;
-char* shared_head = NULL;              // 8MB
+void* shared_head = NULL;              // 8MB
 char* shared_iter = NULL;
 char* shared_char_iter;
 
